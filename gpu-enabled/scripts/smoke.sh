@@ -27,6 +27,22 @@ print("torchaudio", torchaudio.__version__)
 PY
 ok "torch is a CUDA build and the media stack imports"
 
+# The CUDA libraries ctranslate2 dlopen()s must resolve to the torch wheels'
+# copies, not to a system CUDA. This is the assertion that keeps the -runtime
+# base honest: ctranslate2 declares no nvidia dependencies and preloads nothing
+# on Linux, so without the ld.so.conf.d entry the resolution silently depends
+# on import order. Loading a library needs no device, so this stays CPU-only.
+python - <<'CUDALIBS'
+import ctypes
+for lib in ("libcudnn_ops.so.9", "libcublas.so.12", "libcudart.so.12"):
+    ctypes.CDLL(lib)
+    stem = lib.split(".so")[0] + ".so"
+    path = [l.split()[-1] for l in open("/proc/self/maps") if stem in l][0]
+    assert "site-packages" in path, f"{lib} resolved to {path}, expected a torch wheel"
+    print(lib, "->", path)
+CUDALIBS
+ok "CUDA libraries resolve to the torch wheels"
+
 # The lock must be satisfied by what is installed; a drifted lock is a failure
 # here rather than a silent re-resolve in a child image's build.
 uv sync --no-install-project --extra media-gpu --frozen --check >/dev/null \

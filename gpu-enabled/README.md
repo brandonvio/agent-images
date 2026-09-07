@@ -1,6 +1,6 @@
 # gpu-enabled
 
-`brandonvio/gpu-enabled` — a CUDA + cuDNN + ffmpeg base with the GPU media
+`brandonvio/gpu-enabled` — a CUDA + ffmpeg base with the GPU media
 stack already installed: `torch`, `torchaudio`, `whisperx` and
 `pyannote-audio`. Platform: `linux/amd64`.
 

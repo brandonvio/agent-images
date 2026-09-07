@@ -255,14 +255,21 @@ RUN set -euo pipefail && \
     chmod +x /usr/local/bin/kubectl /usr/local/bin/argocd && \
     go version && kubectl version --client=true && argocd version --client
 
+# `--profile default` is kept for clippy and rustfmt, which `--profile minimal`
+# would also drop. It additionally installs rust-docs: 918 MB of offline HTML
+# API documentation under share/doc, which is 61% of the Rust toolchain and
+# nothing reads from inside a container. Removed in the same RUN so it never
+# lands in a layer.
 ARG RUST_VERSION
 RUN set -euo pipefail && \
     curl --proto '=https' --tlsv1.2 -fsSLo /tmp/rustup-init.sh https://sh.rustup.rs && \
     sh /tmp/rustup-init.sh -y --no-modify-path --profile default \
       --default-toolchain "${RUST_VERSION}" && \
     rm /tmp/rustup-init.sh && \
+    rm -rf "${RUSTUP_HOME}"/toolchains/*/share/doc && \
     chmod -R a+rX "${RUSTUP_HOME}" "${CARGO_HOME}" && \
-    rustc --version && cargo --version
+    rustc --version && cargo --version && \
+    cargo clippy --version && rustfmt --version
 
 # ---------------------------------------------------------------------------
 # Shell environment

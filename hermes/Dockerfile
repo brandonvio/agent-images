@@ -32,11 +32,23 @@ ENV HERMES_VERSION=${HERMES_VERSION} \
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 COPY --from=hermes-agent /opt/hermes /opt/hermes
-COPY --from=hermes-workspace /app /opt/hermes-workspace
+# --chmod applies the mode as the files are copied. Doing it afterwards with
+# `chmod -R` rewrites every file of a 1.86 GB bundle into the next layer —
+# changing a file's mode copies it — so the bundle would ship twice.
+#
+# The mode must be octal. A symbolic one (`--chmod=a+rwX`, matching the chmod
+# below) builds without complaint and is then silently ignored, which is the
+# same silent-no-op failure the entrypoint's derived paths guard against.
+COPY --from=hermes-workspace --chmod=777 /app /opt/hermes-workspace
 
+# The bundle's own directory is chmod'd WITHOUT -R: BuildKit creates a COPY
+# destination directory at 0755 and applies --chmod only to the entries copied
+# into it, so this one directory is the sole thing --chmod=777 above misses.
+# Adding -R here would restore the duplicate layer it exists to avoid.
 RUN set -euo pipefail && \
     mkdir -p /opt/data /home/workspace /workspace && \
-    chmod -R a+rwX /opt/data /home/workspace /workspace /opt/hermes-workspace && \
+    chmod -R a+rwX /opt/data /home/workspace /workspace && \
+    chmod a+rwX /opt/hermes-workspace && \
     uv python install "${HERMES_PYTHON_VERSION}" && \
     hermes_python="$(uv python find "${HERMES_PYTHON_VERSION}")" && \
     test -x "${hermes_python}" && \

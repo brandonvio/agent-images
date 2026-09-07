@@ -9,7 +9,7 @@ to Docker Hub under [`brandonvio`](https://hub.docker.com/u/brandonvio).
 | [`brandonvio/hermes`](hermes/) | The Hermes agent and its web workspace, layered onto `agent-base` | `amd64`, `arm64` |
 | [`brandonvio/openclaw`](openclaw/) | The OpenClaw gateway, layered onto `agent-base` | `amd64`, `arm64` |
 | [`brandonvio/cicd-runner`](cicd-runner/) | Ephemeral one-shot CI job runner with an in-container dockerd | `amd64` |
-| [`brandonvio/gpu-enabled`](gpu-enabled/) | CUDA + cuDNN + ffmpeg with `torch`, `torchaudio`, `whisperx` and `pyannote-audio` pre-installed | `amd64` |
+| [`brandonvio/gpu-enabled`](gpu-enabled/) | CUDA + ffmpeg with `torch`, `torchaudio`, `whisperx` and `pyannote-audio` pre-installed (cuDNN from the torch wheels) | `amd64` |
 
 ```bash
 docker pull brandonvio/agent-base:latest
