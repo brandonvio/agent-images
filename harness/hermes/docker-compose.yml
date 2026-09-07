@@ -26,17 +26,29 @@ services:
       HERMES_MODEL: ${HERMES_MODEL:-gpt-5.6-luna}
       HERMES_INFERENCE_MODEL: ${HERMES_MODEL:-gpt-5.6-luna}
       HERMES_INFERENCE_PROVIDER: openai-api
-      HERMES_API_TOKEN: ${HERMES_API_TOKEN:-local-dev}
-      API_SERVER_KEY: ${HERMES_API_TOKEN:-local-dev}
+      # The workspace serves terminals, files and agents. It refuses a
+      # non-loopback bind without a password, and the gateway's API server
+      # refuses a key under 16 characters — that endpoint dispatches
+      # terminal-capable work, so a guessable key is remote code execution.
+      # `make secrets` generates both into .env.
+      HERMES_PASSWORD: ${HERMES_PASSWORD:?run `make secrets` to generate one}
+      HERMES_API_TOKEN: ${HERMES_API_TOKEN:?run `make secrets` to generate one}
+      API_SERVER_KEY: ${HERMES_API_TOKEN:?run `make secrets` to generate one}
+      # workspace mode runs the gateway as root by design; the alternative
+      # entrypoint that drops privileges does not serve the workspace UI.
+      HERMES_ALLOW_ROOT_GATEWAY: "1"
+      # The dashboard refuses a non-loopback bind until an auth provider is
+      # registered, which is config, not environment. Off by default; the
+      # workspace UI on :3000 is the way in. See the README to enable it.
+      HERMES_START_DASHBOARD: "0"
       GATEWAY_ALLOW_ALL_USERS: "true"
       COOKIE_SECURE: "0"
     volumes:
       - hermes-data:/home/workspace/.hermes
     ports:
-      - "3000:3000"     # workspace server
-      - "8642:8642"     # gateway API
-      - "9119:9119"     # dashboard
-      - "2222:22"       # ssh
+      - "127.0.0.1:3000:3000"     # workspace UI
+      - "127.0.0.1:8642:8642"     # gateway API
+      - "127.0.0.1:2222:22"       # ssh
     restart: unless-stopped
 
 volumes:

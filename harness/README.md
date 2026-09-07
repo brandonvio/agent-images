@@ -27,12 +27,44 @@ Both flavours publish the same ports, so run one or the other, not both.
 
 | Service | URL | What |
 | --- | --- | --- |
-| hermes | http://localhost:9119 | dashboard |
-| hermes | http://localhost:3000 | workspace server |
-| hermes | http://localhost:8642 | gateway API |
-| openclaw | http://localhost:18789 | gateway and Control UI |
+| hermes | http://127.0.0.1:3000 | workspace UI — terminals, files, agents |
+| hermes | http://127.0.0.1:8642 | gateway API |
+| openclaw | http://127.0.0.1:18789 | gateway and Control UI |
 
-`ssh` is on 2222 for hermes and 2223 for openclaw.
+`ssh` is on 2222 for hermes and 2223 for openclaw. Every port is published on
+loopback only — these containers hold your API key and serve terminal-capable
+endpoints, so they are not exposed to the LAN by default.
+
+## Secrets
+
+`make secrets` generates what the images require into the gitignored `.env`,
+skipping anything already there:
+
+| Variable | Why |
+| --- | --- |
+| `HERMES_API_TOKEN` | the gateway's API server refuses a key under 16 characters — that endpoint dispatches terminal-capable agent work, so a guessable key is remote code execution |
+| `HERMES_PASSWORD` | the workspace refuses a non-loopback bind without one |
+| `OPENCLAW_GATEWAY_TOKEN` | the openclaw gateway refuses to start without one |
+
+`hermes-up`, `openclaw-up` and `up` depend on it, so it runs on its own.
+
+## Three gates hermes will not let you skip
+
+The published image refuses to start in three separate places, each for a real
+reason, and the compose files answer all three:
+
+1. **Gateway as root.** `workspace` mode runs as root by design; the entrypoint
+   that drops privileges does not serve the workspace UI. Answered with
+   `HERMES_ALLOW_ROOT_GATEWAY=1`.
+2. **Dashboard on a non-loopback bind.** It refuses until an auth provider is
+   registered, and that is config rather than environment — so the dashboard is
+   **off** (`HERMES_START_DASHBOARD=0`) and the workspace UI on `:3000` is the
+   way in. To enable it, set `dashboard.basic_auth.username` and
+   `password_hash` in `config.yaml` inside the volume, then set
+   `HERMES_START_DASHBOARD=1` and publish 9119.
+3. **Workspace on a non-loopback bind without a password.** Answered with a
+   generated `HERMES_PASSWORD` rather than the `HERMES_ALLOW_INSECURE_REMOTE`
+   bypass.
 
 ## The key is never in an image
 

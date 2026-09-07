@@ -11,7 +11,7 @@ HERMES_COMPOSE   := docker compose --env-file $(ENV_FILE) -f $(HARNESS_DIR)/herm
 OPENCLAW_COMPOSE := docker compose --env-file $(ENV_FILE) -f $(HARNESS_DIR)/openclaw/docker-compose.yml
 
 .PHONY: help check build up down restart logs ps shell-hermes shell-openclaw pull-bases digests \
-        hermes-up hermes-down hermes-logs openclaw-up openclaw-down openclaw-logs
+        hermes-up hermes-down hermes-logs openclaw-up openclaw-down openclaw-logs secrets
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z-]+:.*##/ {printf "  \033[36m%-16s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
@@ -22,9 +22,25 @@ check: ## Verify the key is readable without printing it
 	  && echo "ok: OPENAI_API_KEY present in $(ENV_FILE)" \
 	  || { echo "FAIL: no OPENAI_API_KEY in $(ENV_FILE)"; exit 1; }
 
-hermes-up: check ## Run the published hermes image (builds nothing)
+secrets: ## Generate the local secrets hermes requires into .env, if absent
+	@touch $(ENV_FILE)
+	@# A file whose last line has no newline would otherwise have the next
+	@# variable appended to the end of it, silently corrupting that value.
+	@if [ -s $(ENV_FILE) ] && [ -n "$$(tail -c1 $(ENV_FILE))" ]; then printf '\n' >> $(ENV_FILE); fi
+	@grep -q '^HERMES_API_TOKEN=' $(ENV_FILE) || { \
+	  printf 'HERMES_API_TOKEN=%s\n' "$$(openssl rand -hex 32)" >> $(ENV_FILE); \
+	  echo "generated HERMES_API_TOKEN into $(ENV_FILE)"; }
+	@grep -q '^HERMES_PASSWORD=' $(ENV_FILE) || { \
+	  printf 'HERMES_PASSWORD=%s\n' "$$(openssl rand -hex 16)" >> $(ENV_FILE); \
+	  echo "generated HERMES_PASSWORD into $(ENV_FILE)"; }
+	@grep -q '^OPENCLAW_GATEWAY_TOKEN=' $(ENV_FILE) || { \
+	  printf 'OPENCLAW_GATEWAY_TOKEN=%s\n' "$$(openssl rand -hex 32)" >> $(ENV_FILE); \
+	  echo "generated OPENCLAW_GATEWAY_TOKEN into $(ENV_FILE)"; }
+	@echo "ok: hermes and openclaw secrets present in $(ENV_FILE)"
+
+hermes-up: check secrets ## Run the published hermes image (builds nothing)
 	$(HERMES_COMPOSE) up -d
-	@echo "hermes  dashboard http://localhost:9119   workspace http://localhost:3000"
+	@echo "hermes  workspace http://127.0.0.1:3000   gateway API http://127.0.0.1:8642"
 
 hermes-down: ## Stop the published hermes container
 	$(HERMES_COMPOSE) down
@@ -32,9 +48,9 @@ hermes-down: ## Stop the published hermes container
 hermes-logs: ## Follow the published hermes container's logs
 	$(HERMES_COMPOSE) logs -f
 
-openclaw-up: check ## Run the published openclaw image (builds nothing)
+openclaw-up: check secrets ## Run the published openclaw image (builds nothing)
 	$(OPENCLAW_COMPOSE) up -d
-	@echo "openclaw  control ui http://localhost:18789"
+	@echo "openclaw  control ui http://127.0.0.1:18789"
 
 openclaw-down: ## Stop the published openclaw container
 	$(OPENCLAW_COMPOSE) down
@@ -45,11 +61,11 @@ openclaw-logs: ## Follow the published openclaw container's logs
 build: check ## Build both harness images
 	$(COMPOSE) build
 
-up: check ## Start both agents
+up: check secrets ## Start both agents
 	mkdir -p $(HARNESS_DIR)/workspace
 	$(COMPOSE) up -d
 	@echo "hermes    dashboard  http://localhost:9119   workspace http://localhost:3000"
-	@echo "openclaw  control ui http://localhost:18789"
+	@echo "openclaw  control ui http://127.0.0.1:18789"
 
 down: ## Stop and remove both containers
 	$(COMPOSE) down
