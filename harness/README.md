@@ -1,8 +1,20 @@
 # harness
 
-A local harness for the two agent images. Each service is the published image
-from Docker Hub with one thin layer on top that points its **default agent** at
-the OpenAI API and then hands off to the image's own entrypoint unchanged.
+A local harness for the two agent images, in two flavours.
+
+**Pull-only — builds nothing.** One compose file per agent, each standing alone,
+running the published image straight from Docker Hub with your OpenAI key:
+
+```bash
+make hermes-up          # harness/hermes/docker-compose.yml
+make openclaw-up        # harness/openclaw/docker-compose.yml
+make hermes-down
+make openclaw-down
+```
+
+**Built — a thin layer per agent.** Adds an entrypoint wrapper on top of the
+published image, pinned by digest, for when you want the configuration baked in
+rather than expressed in compose:
 
 ```bash
 make build
@@ -10,6 +22,8 @@ make up
 make logs
 make down
 ```
+
+Both flavours publish the same ports, so run one or the other, not both.
 
 | Service | URL | What |
 | --- | --- | --- |
@@ -77,9 +91,47 @@ Note the openclaw base image's own entrypoint still rewrites its gateway keys
 (bind, auth, token, Control UI) on every start. That is upstream behaviour this
 harness does not change.
 
+## How each flavour applies the configuration
+
+The pull-only files reach the same end state as the built images by a different
+route, because there is no wrapper entrypoint to lean on.
+
+**hermes needs no wrapper at all.** Everything it requires is environment:
+`HERMES_MODEL` and `HERMES_INFERENCE_MODEL` for the model, and
+`HERMES_INFERENCE_PROVIDER=openai-api` for the provider. This works precisely
+because the volume starts empty — with no `config.yaml`, the per-turn sync falls
+back to the same environment the startup path reads, so both agree. Verified on
+a fresh volume:
+
+```
+startup model    ('gpt-5.6-luna', None)
+per-turn target  ('gpt-5.6-luna', '')
+provider         openai-api → https://api.openai.com/v1   (key source: env:OPENAI_API_KEY)
+```
+
+Once you choose a model in the dashboard, Hermes writes `config.yaml` and that
+file wins from then on. That is the intended behaviour. `docker compose down -v`
+returns you to what the environment says.
+
+**openclaw needs a few lines.** It has no environment variable for the default
+model — that setting lives in config — so its compose file overrides the
+entrypoint with a short script that writes the two keys and then execs the
+image's own entrypoint. Each key is written only when absent, so a restart
+changes nothing:
+
+```
+openclaw-compose: set agents.defaults.model.primary = openai/gpt-5.6-luna
+openclaw-compose: set models.providers.openai.agentRuntime.id = openclaw
+# after a restart:
+openclaw-compose: agents.defaults.model.primary is already openai/gpt-5.6-luna, leaving it alone
+```
+
 ## Bases are pinned
 
-Both Dockerfiles pin their `FROM` by digest, like everything else in this repo.
+The two Dockerfiles pin their `FROM` by digest, like everything else in this
+repo. The pull-only compose files deliberately track `:latest` with
+`pull_policy: always`, since running the current published image is their whole
+purpose — set `HERMES_IMAGE` or `OPENCLAW_IMAGE` to a digest to pin them too.
 To move them forward:
 
 ```bash

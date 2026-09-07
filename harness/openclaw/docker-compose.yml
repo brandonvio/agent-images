@@ -1,0 +1,66 @@
+# Run the published openclaw image directly — nothing is built here.
+#
+#   docker compose --env-file ../../.env -f docker-compose.yml up -d
+#   (or, from harness/:  make openclaw-up)
+#
+# OpenClaw has no environment variable for the default model — that lives in
+# config, so it has to be written once inside the container. The entrypoint
+# below does exactly that and then hands off to the image's own entrypoint
+# untouched. It writes each key only when the key is absent, so a restart with
+# the same settings changes nothing and a model you pick later in the Control UI
+# survives.
+#
+# Two settings are needed, not one: `openai/<model>` routes to the native Codex
+# app-server harness, which expects a ChatGPT OAuth sign-in, so the API-key
+# route also needs the openai provider pinned to OpenClaw's own runtime.
+#
+# `$$` is an escaped `$` — it reaches the shell, not compose's interpolation.
+
+name: openclaw-agent
+
+services:
+  openclaw:
+    image: ${OPENCLAW_IMAGE:-brandonvio/openclaw:latest}
+    pull_policy: always
+    container_name: openclaw-agent
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY in the repo-root .env}
+      OPENCLAW_MODEL: ${OPENCLAW_MODEL:-openai/gpt-5.6-luna}
+      # Local-only shared token. The gateway refuses to start without one, and
+      # it is the only thing between the network and the dashboard — do not
+      # expose 18789 beyond a network you control.
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-local-dev}
+    entrypoint:
+      - /usr/bin/tini
+      - --
+      - /bin/bash
+      - -c
+      - |
+        set -euo pipefail
+        state="$${OPENCLAW_STATE_DIR:-/home/openclaw/.openclaw}"
+        mkdir -p "$$state"
+        chown -R openclaw:openclaw "$$state" 2>/dev/null || true
+
+        seed() {
+          have="$$(gosu openclaw openclaw config get "$$1" 2>/dev/null || true)"
+          if [ -n "$$have" ]; then
+            echo "openclaw-compose: $$1 is already $$have, leaving it alone"
+          else
+            gosu openclaw openclaw config set "$$1" "$$2" >/dev/null
+            echo "openclaw-compose: set $$1 = $$2"
+          fi
+        }
+
+        seed agents.defaults.model.primary "$$OPENCLAW_MODEL"
+        seed models.providers.openai.agentRuntime.id openclaw
+
+        exec /entrypoint.sh gateway
+    volumes:
+      - openclaw-data:/home/openclaw
+    ports:
+      - "18789:18789"   # gateway and Control UI
+      - "2223:22"       # ssh
+    restart: unless-stopped
+
+volumes:
+  openclaw-data:

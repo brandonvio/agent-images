@@ -1,0 +1,43 @@
+# Run the published hermes image directly — nothing is built here.
+#
+#   docker compose --env-file ../../.env -f docker-compose.yml up -d
+#   (or, from harness/:  make hermes-up)
+#
+# Hermes is configured entirely through the environment, which works because
+# this starts on an empty data volume. Two variables carry the model because
+# Hermes reads it in two places: HERMES_MODEL at startup, HERMES_INFERENCE_MODEL
+# for the oneshot/seed path. HERMES_INFERENCE_PROVIDER must name `openai-api`
+# explicitly — under the default `auto`, a bare OPENAI_API_KEY is treated as an
+# OpenRouter credential and never reaches api.openai.com.
+#
+# Once you pick a model in the dashboard, Hermes writes config.yaml into the
+# volume and that file wins from then on — which is the intended behaviour, not
+# a bug. Delete the volume to go back to what these variables say.
+
+name: hermes-agent
+
+services:
+  hermes:
+    image: ${HERMES_IMAGE:-brandonvio/hermes:latest}
+    pull_policy: always
+    container_name: hermes-agent
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY in the repo-root .env}
+      HERMES_MODEL: ${HERMES_MODEL:-gpt-5.6-luna}
+      HERMES_INFERENCE_MODEL: ${HERMES_MODEL:-gpt-5.6-luna}
+      HERMES_INFERENCE_PROVIDER: openai-api
+      HERMES_API_TOKEN: ${HERMES_API_TOKEN:-local-dev}
+      API_SERVER_KEY: ${HERMES_API_TOKEN:-local-dev}
+      GATEWAY_ALLOW_ALL_USERS: "true"
+      COOKIE_SECURE: "0"
+    volumes:
+      - hermes-data:/home/workspace/.hermes
+    ports:
+      - "3000:3000"     # workspace server
+      - "8642:8642"     # gateway API
+      - "9119:9119"     # dashboard
+      - "2222:22"       # ssh
+    restart: unless-stopped
+
+volumes:
+  hermes-data:
