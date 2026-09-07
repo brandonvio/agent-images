@@ -1,4 +1,4 @@
-# Build and publish brandonvio/agent-base to Docker Hub.
+# Build and publish brandonvio/openclaw to Docker Hub.
 #
 # This workflow is self-contained: it is triggered only by changes to its own
 # image directory and to this file, it never triggers or waits on another
@@ -8,15 +8,17 @@
 # Each architecture builds natively and pushes by digest only. Tags are applied
 # once, in the merge job, after every architecture's smoke test has passed — so
 # a build that fails smoke publishes no tag at all and `latest` never regresses.
+#
+# openclaw builds on the published agent-base, resolved to a digest below.
 
-name: agent-base
+name: openclaw
 
 on:
   push:
     branches: [main]
     paths:
-      - 'agent-base/**'
-      - '.github/workflows/agent-base.yml'
+      - 'openclaw/**'
+      - '.github/workflows/openclaw.yml'
   workflow_dispatch:
 
 concurrency:
@@ -24,11 +26,42 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE: brandonvio/agent-base
+  IMAGE: brandonvio/openclaw
 
 jobs:
+  resolve-base:
+    name: resolve agent-base
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.base.outputs.ref }}
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: brandonvio
+          password: ${{ secrets.DOCKER_PAT }}
+
+      # Resolved once, here, so both architecture legs provably build on the
+      # same base. Resolving the tag independently in each leg could straddle
+      # an agent-base publish and ship one index whose legs disagree.
+      #
+      # This reads the published image from Docker Hub like any other external
+      # base image. It is not a dependency on the agent-base workflow: nothing
+      # here waits for, triggers, or is gated by that workflow's runs.
+      - name: Resolve the published agent-base to a digest
+        id: base
+        run: |
+          set -euo pipefail
+          digest="$(docker buildx imagetools inspect brandonvio/agent-base:latest \
+                      --format '{{ .Manifest.Digest }}')"
+          test -n "$digest"
+          echo "ref=brandonvio/agent-base@${digest}" >> "$GITHUB_OUTPUT"
+          echo "building on brandonvio/agent-base@${digest}"
+
   build:
     name: build ${{ matrix.arch }}
+    needs: resolve-base
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -63,22 +96,20 @@ jobs:
         id: build
         run: |
           set -euo pipefail
-          export PINS_JSON="$(cat agent-base/pins.json)"
-          export CLIS_JSON="$(cat agent-base/package.json)"
+          export PINS_JSON="$(cat openclaw/pins.json)"
           export SOURCE_COMMIT="${GITHUB_SHA}"
           export BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           export BUILD_VERSION="${GITHUB_RUN_NUMBER}"
-          export BUILDX_NO_DEFAULT_ATTESTATIONS=1
+          export AGENT_BASE_IMAGE="${{ needs.resolve-base.outputs.ref }}"
           cache="$IMAGE:buildcache-${{ matrix.arch }}"
-          cd agent-base
-          docker buildx bake agent-base \
-            --set "agent-base.tags=" \
-            --set "agent-base.platform=linux/${{ matrix.arch }}" \
-            --set "agent-base.cache-from=type=registry,ref=${cache}" \
-            --set "agent-base.cache-to=type=registry,ref=${cache},mode=max,image-manifest=true,oci-mediatypes=true" \
-            --set "agent-base.output=type=image,name=$IMAGE,push-by-digest=true,name-canonical=true,push=true" \
+          cd openclaw
+          docker buildx bake openclaw \
+            --set "openclaw.platform=linux/${{ matrix.arch }}" \
+            --set "openclaw.cache-from=type=registry,ref=${cache}" \
+            --set "openclaw.cache-to=type=registry,ref=${cache},mode=max,image-manifest=true,oci-mediatypes=true" \
+            --set "openclaw.output=type=image,name=$IMAGE,push-by-digest=true,name-canonical=true,push=true" \
             --metadata-file /tmp/bake-metadata.json
-          digest="$(jq -r '.["agent-base"]["containerimage.digest"]' /tmp/bake-metadata.json)"
+          digest="$(jq -r '.["openclaw"]["containerimage.digest"]' /tmp/bake-metadata.json)"
           test -n "$digest" && test "$digest" != "null"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           echo "built $IMAGE@$digest"
@@ -90,7 +121,7 @@ jobs:
           set -euo pipefail
           ref="$IMAGE@${{ steps.build.outputs.digest }}"
           docker pull "$ref"
-          make -C agent-base smoke IMAGE_REF="$ref"
+          make -C openclaw smoke IMAGE_REF="$ref"
 
       - name: Record digest
         run: |
