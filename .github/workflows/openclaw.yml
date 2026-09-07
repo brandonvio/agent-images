@@ -100,10 +100,12 @@ jobs:
           export SOURCE_COMMIT="${GITHUB_SHA}"
           export BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           export BUILD_VERSION="${GITHUB_RUN_NUMBER}"
+          export BUILDX_NO_DEFAULT_ATTESTATIONS=1
           export AGENT_BASE_IMAGE="${{ needs.resolve-base.outputs.ref }}"
           cache="$IMAGE:buildcache-${{ matrix.arch }}"
           cd openclaw
           docker buildx bake openclaw \
+            --set "openclaw.tags=" \
             --set "openclaw.platform=linux/${{ matrix.arch }}" \
             --set "openclaw.cache-from=type=registry,ref=${cache}" \
             --set "openclaw.cache-to=type=registry,ref=${cache},mode=max,image-manifest=true,oci-mediatypes=true" \
