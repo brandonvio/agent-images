@@ -1,0 +1,71 @@
+# Shared interactive shell config for agent containers.
+
+export ZSH="${ZSH:-/opt/oh-my-zsh}"
+export ZSH_CUSTOM="${ZSH_CUSTOM:-/opt/oh-my-zsh/custom}"
+export ZSH_THEME="${ZSH_THEME:-maran}"
+
+HISTFILE="${HISTFILE:-$HOME/.zsh_history}"
+HISTSIZE=50000
+SAVEHIST=50000
+
+setopt append_history
+setopt share_history
+setopt hist_ignore_dups
+setopt hist_ignore_space
+setopt auto_cd
+setopt auto_pushd
+setopt pushd_ignore_dups
+setopt correct
+setopt complete_in_word
+setopt always_to_end
+
+plugins=(
+  git
+  gh
+  docker
+  docker-compose
+  kubectl
+  npm
+  node
+  python
+  rust
+  golang
+  direnv
+  colored-man-pages
+  command-not-found
+  extract
+  sudo
+  history-substring-search
+  zsh-completions
+  zsh-autosuggestions
+  zsh-syntax-highlighting
+)
+
+if [[ -r "$ZSH/oh-my-zsh.sh" ]]; then
+  source "$ZSH/oh-my-zsh.sh"
+fi
+
+if command -v direnv >/dev/null 2>&1; then
+  eval "$(direnv hook zsh)"
+fi
+
+if [[ -r /usr/share/doc/fzf/examples/key-bindings.zsh ]]; then
+  source /usr/share/doc/fzf/examples/key-bindings.zsh
+fi
+
+if [[ -r /usr/share/doc/fzf/examples/completion.zsh ]]; then
+  source /usr/share/doc/fzf/examples/completion.zsh
+fi
+
+if command -v kubectl >/dev/null 2>&1; then
+  source <(kubectl completion zsh)
+fi
+
+if command -v gh >/dev/null 2>&1; then
+  eval "$(gh completion -s zsh)"
+fi
+
+alias ll='ls -lah'
+alias la='ls -A'
+alias gs='git status --short --branch'
+alias k='kubectl'

@@ -1,0 +1,18 @@
+{
+  "managed": {
+    "python": {
+      "version": "3.13.15"
+    }
+  },
+  "manual": {
+    "hermes": {
+      "version": "v2026.7.1"
+    },
+    "hermes_agent": {
+      "ref": "nousresearch/hermes-agent:v2026.7.1@sha256:b6c019227889e6675424a2b6223b2cafdd36bf7d1048d1ddd8e043b880d6cc0f"
+    },
+    "hermes_workspace": {
+      "ref": "ghcr.io/outsourc-e/hermes-workspace:latest@sha256:1ec05339750da7caaf1cd0183c8c3b188856918b377407b4ac1dafca67e42d88"
+    }
+  }
+}

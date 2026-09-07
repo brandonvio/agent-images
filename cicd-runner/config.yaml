@@ -1,0 +1,17 @@
+# Runner config for one-job mode. The connection (url/uuid/token) is supplied
+# by the entrypoint via CLI flags; this file only configures how jobs execute.
+runner:
+  capacity: 1
+container:
+  # Mount this container's own dockerd socket into every job container at
+  # /var/run/docker.sock so workflow steps can run `docker build` / `docker run`
+  # against the in-container daemon.
+  docker_host: "automount"
+  # Bind-mount allowlist for job containers. The default below permits any host
+  # path, which is only defensible because this runner is ephemeral, runs a
+  # single job, and is expected to be isolated at the platform level. If you run
+  # it anywhere those three do not hold, replace this with the specific paths
+  # your jobs need.
+  valid_volumes:
+    - '**'
+  force_pull: false

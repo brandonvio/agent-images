@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${AGENT_START_SSHD:-1}" != "1" ]]; then
+  exit 0
+fi
+
+host_keys_dir="${AGENT_SSH_HOST_KEYS_DIR:-/var/lib/agent-base/ssh-host-keys}"
+authorized_keys_path="${AGENT_SSH_AUTHORIZED_KEYS_PATH:-/tmp/ssh-keys/authorized_keys}"
+authorized_users="${AGENT_SSH_AUTHORIZED_USERS:-root hermes-agent}"
+
+install_authorized_keys() {
+  local user="$1"
+  local home
+  local group
+
+  home="$(getent passwd "$user" | cut -d: -f6)"
+  group="$(id -gn "$user")"
+  [[ -n "$home" && -n "$group" ]] || return 0
+
+  install -d -m 700 -o "$user" -g "$group" "$home/.ssh"
+  cp "$authorized_keys_path" "$home/.ssh/authorized_keys"
+  chown "$user:$group" "$home/.ssh/authorized_keys"
+  chmod 600 "$home/.ssh/authorized_keys"
+}
+
+if [[ -f "$authorized_keys_path" ]]; then
+  for user in $authorized_users; do
+    getent passwd "$user" >/dev/null || continue
+    install_authorized_keys "$user"
+  done
+fi
+
+mkdir -p "$host_keys_dir" /run/sshd
+
+if [[ -f "$host_keys_dir/ssh_host_ed25519_key" ]]; then
+  for key_file in "$host_keys_dir"/ssh_host_*_key "$host_keys_dir"/ssh_host_*_key.pub; do
+    [[ -f "$key_file" ]] && cp -f "$key_file" /etc/ssh/
+  done
+else
+  ssh-keygen -A
+  for key_file in /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub; do
+    [[ -f "$key_file" ]] && cp -f "$key_file" "$host_keys_dir/"
+  done
+fi
+
+for key_file in /etc/ssh/ssh_host_*_key; do
+  [[ -f "$key_file" ]] && chmod 600 "$key_file"
+done
+for key_file in /etc/ssh/ssh_host_*_key.pub; do
+  [[ -f "$key_file" ]] && chmod 644 "$key_file"
+done
+
+if pgrep -x sshd >/dev/null 2>&1; then
+  exit 0
+fi
+
+/usr/sbin/sshd

@@ -1,0 +1,7 @@
+.git
+.DS_Store
+node_modules
+README.md
+Makefile
+docker-bake.hcl
+scripts

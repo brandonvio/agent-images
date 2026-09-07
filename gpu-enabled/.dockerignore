@@ -1,0 +1,8 @@
+.git
+.DS_Store
+.venv
+__pycache__
+README.md
+Makefile
+docker-bake.hcl
+scripts

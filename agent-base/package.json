@@ -1,0 +1,12 @@
+{
+  "name": "agent-base-clis",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Global CLI set baked into the agent-base image. Exact versions only; refreshed by the nightly pin-refresh job.",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.263",
+    "@openai/codex": "0.153.4",
+    "playwright": "1.63.0"
+  }
+}

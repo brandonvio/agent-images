@@ -1,0 +1,10 @@
+.git
+node_modules
+__pycache__
+.pytest_cache
+.venv
+dist
+build
+README.md
+Makefile
+docker-bake.hcl

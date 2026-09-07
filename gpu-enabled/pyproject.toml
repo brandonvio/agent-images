@@ -1,0 +1,17 @@
+[project]
+name = "gpu-enabled"
+version = "0.1.0"
+description = "CUDA + ffmpeg base layer with the GPU media stack pre-installed."
+requires-python = "==3.12.*"
+dependencies = []
+
+[project.optional-dependencies]
+media-gpu = [
+    "torch>=2.6",
+    "torchaudio>=2.6",
+    "whisperx>=3.4",
+    "pyannote-audio>=3.3",
+]
+
+[tool.uv]
+environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]

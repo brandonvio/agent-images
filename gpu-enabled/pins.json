@@ -1,0 +1,11 @@
+{
+  "managed": {
+    "cuda": {
+      "ref": "nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04@sha256:8aef630a54bc5c5146ae5ce68e6af5caa3df0fb690bb91544175c91f307e4356"
+    },
+    "uv": {
+      "ref": "ghcr.io/astral-sh/uv:0.12.10@sha256:2bb3ebca0a796a155094a27773d290c4b074572e6107f171d88d086682fd2500"
+    }
+  },
+  "manual": {}
+}
