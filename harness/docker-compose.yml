@@ -1,0 +1,54 @@
+# Local harness for the two agent images.
+#
+# Only OPENAI_API_KEY is mapped into the containers. The repo-root .env is read
+# for interpolation (see the Makefile's --env-file), which also carries
+# DOCKER_PAT — that one is a registry credential with no business inside an
+# agent container, so it is deliberately not passed through.
+
+name: agent-harness
+
+services:
+  hermes:
+    build:
+      context: ./hermes
+    image: agent-harness/hermes:local
+    container_name: harness-hermes
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY in the repo-root .env}
+      HARNESS_MODEL: ${HERMES_MODEL:-gpt-5.6-luna}
+      HERMES_API_TOKEN: ${HERMES_API_TOKEN:-local-dev}
+      API_SERVER_KEY: ${HERMES_API_TOKEN:-local-dev}
+      GATEWAY_ALLOW_ALL_USERS: "true"
+      COOKIE_SECURE: "0"
+    volumes:
+      - hermes-data:/home/workspace/.hermes
+      - ./workspace:/workspace
+    ports:
+      - "3000:3000"     # workspace server
+      - "8642:8642"     # gateway API
+      - "9119:9119"     # dashboard
+      - "2222:22"       # ssh
+    restart: unless-stopped
+
+  openclaw:
+    build:
+      context: ./openclaw
+    image: agent-harness/openclaw:local
+    container_name: harness-openclaw
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY in the repo-root .env}
+      HARNESS_MODEL: ${OPENCLAW_MODEL:-openai/gpt-5.6-luna}
+      # Local-only shared token. The gateway refuses to start without one, and
+      # it is the only thing between the network and the dashboard — do not
+      # expose 18789 beyond a network you control.
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-local-dev}
+    volumes:
+      - openclaw-data:/home/openclaw
+    ports:
+      - "18789:18789"   # gateway and Control UI
+      - "2223:22"       # ssh
+    restart: unless-stopped
+
+volumes:
+  hermes-data:
+  openclaw-data:
